@@ -52,6 +52,13 @@ class streamModel:
 
             #need to add random theta, phi values and displace st orbiter.pos = gc.pos + \vec(jacobiradius)
 
+            randomPhi = 2. * np.pi * np.random.rand()
+            randomTheta = np.arccos(1. - 2. * np.random.rand())
+            
+            orbiter.x += self.jacobiRadius * np.cos(randomTheta) * np.cos(randomPhi)
+            orbiter.y += self.jacobiRadius * np.cos(randomTheta) * np.sin(randomPhi)
+            orbiter.z += self.jacobiRadius * np.sin(randomTheta)
+
 def orbitGetter(dataFile, specialGCs):
     
     df = pd.read_csv(dataFile, delim_whitespace=True, names=['Name','ra','dec','dist','disterr','vlos','vloserr',

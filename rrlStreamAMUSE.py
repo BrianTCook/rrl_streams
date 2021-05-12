@@ -9,55 +9,59 @@ Created on Tue May 11 12:16:55 2021
 import numpy as np
 import pandas as pd
 
-#from amuse.lab import *
+from amuse.lab import *
+from amuse.couple import bridge
+from amuse.support import io
 
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 from galpy.orbit import Orbit
 from galpy.util import bovy_conversion
-from galpy.potential import MWPotential2014
+from galpy.potential import MWPotential2014, to_amuse
 
 np.random.seed(42)
     
 class streamModel:
-    def __init__(self, centralMass, rrlMass, orbit, nOrbiters):
+	def __init__(self, centralMass, orbit, rrlMass, nOrbiters):
 
-        #measured mass, phase space data for the globular cluster
-        self.centralParticle = Particle()
-        self.centralParticle.mass = centralMass
-        self.centralParticle.x = orbit.x
-        self.centralParticle.y = orbit.y
-        self.centralParticle.z = orbit.z
-        self.centralParticle.vx = orbit.vx
-        self.centralParticle.vy = orbit.vy
-        self.centralParticle.vz = orbit.vz
-            
-        self.enclosedGalaxyMass = np.sum( [ massElement.mass(np.sqrt(self.CentralParticle.x()**2. + self.CentralParticle.y()**2.), z=self.CentralParticle.z())*bovy_conversion.mass_in_msol(220., 8.) for massElement in MWPotential2014 ] )
+		#measured mass, phase space data for the globular cluster
+		self.centralParticle = Particle(1)
+		self.centralParticle.mass = centralMass
+		self.centralParticle.x = orbit.x
+		self.centralParticle.y = orbit.y
+		self.centralParticle.z = orbit.z
+		self.centralParticle.vx = orbit.vx
+		self.centralParticle.vy = orbit.vy
+		self.centralParticle.vz = orbit.vz
 
-        #enclosed galactic mass and jacobi radius
-        self.galactocentricDist = np.sqrt(self.CentralParticle.x()**2. + self.CentralParticle.y()**2. + self.CentralParticle.z()**2.)
-        self.jacobiRadius = 3. * self.galactocentricDist * (self.centralMass / self.enclosedMass)**(1/3.)
-        
-        self.orbitingParticles = [ Particle() for i in range(nOrbiters) ]
-        
-        for orbiter in self.orbitingParticles:
-            
-            orbiter.mass = rrlMass
-            orbiter.x = orbit.x
-            orbiter.y = orbit.y
-            orbiter.z = orbit.z
-            orbiter.vx = orbit.vx
-            orbiter.vy = orbit.vy
-            orbiter.vz = orbit.vz
+		self.enclosedGalaxyMass = np.sum( [ massElement.mass(np.sqrt(self.centralParticle.x()**2. + self.centralParticle.y()**2.), z=self.centralParticle.z())*bovy_conversion.mass_in_msol(220., 8.) for massElement in MWPotential2014 ] )
 
-            #need to add random theta, phi values and displace st orbiter.pos = gc.pos + \vec(jacobiradius)
+		#enclosed galactic mass and jacobi radius
+		self.galactocentricDist = np.sqrt(self.centralParticle.x()**2. + self.centralParticle.y()**2. + self.centralParticle.z()**2.)
+		self.jacobiRadius = 3. * self.galactocentricDist * (centralMass / self.enclosedGalaxyMass)**(1/3.)
 
-            randomPhi = 2. * np.pi * np.random.rand()
-            randomTheta = np.arccos(1. - 2. * np.random.rand())
-            
-            orbiter.x += self.jacobiRadius * np.cos(randomTheta) * np.cos(randomPhi)
-            orbiter.y += self.jacobiRadius * np.cos(randomTheta) * np.sin(randomPhi)
-            orbiter.z += self.jacobiRadius * np.sin(randomTheta)
+		self.orbitingParticles = Particle(nOrbiters)
+
+		'''
+		for orbiter in self.orbitingParticles:
+
+		orbiter.mass = rrlMass
+		orbiter.x = orbit.x
+		orbiter.y = orbit.y
+		orbiter.z = orbit.z
+		orbiter.vx = orbit.vx
+		orbiter.vy = orbit.vy
+		orbiter.vz = orbit.vz
+
+		#need to add random theta, phi values and displace st orbiter.pos = gc.pos + vec(jacobiradius)
+
+		randomPhi = 2. * np.pi * np.random.rand()
+		randomTheta = np.arccos(1. - 2. * np.random.rand())
+
+		orbiter.x() += self.jacobiRadius * np.cos(randomTheta) * np.cos(randomPhi)
+		orbiter.y() += self.jacobiRadius * np.cos(randomTheta) * np.sin(randomPhi)
+		orbiter.z() += self.jacobiRadius * np.sin(randomTheta)
+		'''
 
 def orbitGetter(dataFile, specialGCs):
     
@@ -95,19 +99,19 @@ def solver_codes_initial_setup(galaxy_code, streamModels):
 	Nemesis gravity solvers?
 	'''
 
-    converter_parent = nbody_system.nbody_to_si(1e11|units.MSun, 15.|units.kpc)
-    converter_sub = nbody_system.nbody_to_si(0.65|units.MSun, 1.|units.parsec) 
-    
-    gravity = bridge.Bridge(use_threading=False)
-    
-    for stream in streamModels:
-    
-        herm = Hermite(converter_parent)
-        herm.particles.add_particles(stream.centralParticle)
-        #herm.particles.add_particles(stream.orbitingParticles)
-        gravity.add_system(herm, (galaxy_code,))  
-    
-    return gravity.particles, gravity
+	converter_parent = nbody_system.nbody_to_si(1e11|units.MSun, 15.|units.kpc)
+	converter_sub = nbody_system.nbody_to_si(0.65|units.MSun, 1.|units.parsec) 
+
+	gravity = bridge.Bridge(use_threading=False)
+
+	for stream in streamModels:
+
+		herm = Hermite(converter_parent)
+		herm.particles.add_particles(stream.centralParticle)
+		#herm.particles.add_particles(stream.orbitingParticles)
+		gravity.add_system(herm, (galaxy_code,))  
+
+	return gravity.particles, gravity
 
 
 def simulation(streamModels):
@@ -122,12 +126,12 @@ def simulation(streamModels):
 	t_end, dt = 1000.|units.Myr, 0.01|units.Myr
 
 	sim_times_unitless = np.arange(0., (t_end+dt).value_in(units.Myr), dt.value_in(units.Myr))
-    sim_tmes = [ t|units.Myr for t in sim_times_unitless ]
+	sim_tmes = [ t|units.Myr for t in sim_times_unitless ]
 
 	#for 3D numpy array storage
 	Nsavetimes = 99
 	Ntotal = len(gravity.particles)
-	    
+
 	grav_data = np.zeros((Nsavetimes, Ntotal, 7))
 	energy_data = np.zeros(Nsavetimes)
 
@@ -156,7 +160,7 @@ def simulation(streamModels):
 		if j%saving_flag == 0:
 
 			print('j = %i'%(j))
-            
+
 			energy = gravity.particles.potential_energy() + gravity.particles.kinetic_energy()
 			deltaE = energy/energy_init - 1.
 
@@ -167,14 +171,14 @@ def simulation(streamModels):
 			#gravity stuff
 
 			io.write_set_to_file(gravity.particles, filename_grav, 'csv',
-					 attribute_types = (units.MSun, units.parsec, units.parsec, units.parsec, units.kms, units.kms, units.kms),
-					 attribute_names = attributes_grav)
+	attribute_types = (units.MSun, units.parsec, units.parsec, units.parsec, units.kms, units.kms, units.kms),
+	attribute_names = attributes_grav)
 
 			data_t_grav = pd.read_csv(filename_grav, names=list(attributes_grav))
 			data_t_grav = data_t_grav.drop([0, 1, 2]) #removes labels units, and unit names
 
 			data_t_grav = data_t_grav.astype(float) #strings to floats
-            
+
 			grav_data[j_like_index, :len(data_t_grav.index), :] = data_t_grav.values
 			np.savetxt('PhaseSpace_%s_%s_frame_%s_LCC.ascii'%(forward_or_backward, background_str, str(j).rjust(5, '0')), data_t_grav.values)
 
@@ -183,27 +187,31 @@ def simulation(streamModels):
 		channel_from_framework_to_gravity.copy()
 		gravity.evolve_model(t)
 		channel_from_gravity_to_framework.copy()
-    
+
 	gravity.stop()
-		
-    return 1
+
+	return 1
 
 
 if __name__ in '__main__':
     
-    dataFile = 'gcVasiliev.txt'
-    specialGCs = [ 'NGC_362', 'NGC_6626_M_28', 'Pal_5' ]
-    galaxy_code = MWPotential2014
-    
-    sortedNames, orbits = orbitGetter(dataFile, specialGCs)
-    specialGCs = sortedNames #sorted after being filled in from pandas dataframe
-    
-    models = [ 0. for i in range(len(specialGCs)) ]
-    
-    for idx, orbit in enumerate(orbits):
-        
-        models[idx] = streamModel(masses[idx], orbit)
-        
-    simulation(streamModels)
+	dataFile = 'gcVasiliev.txt'
+	specialGCs = [ 'NGC_362', 'NGC_6626_M_28', 'Pal_5' ]
+	
+	gcMasses = [ 1., 1., 1. ]
+	rrlMass, nOrbiters = 0.65, 100
+
+	galaxy_code = MWPotential2014
+
+	sortedNames, orbits = orbitGetter(dataFile, specialGCs)
+	specialGCs = sortedNames #sorted after being filled in from pandas dataframe
+
+	streamModels = [ 0. for i in range(len(specialGCs)) ]
+
+	for idx, orbit in enumerate(orbits):
+
+		streamModels[idx] = streamModel(gcMasses[idx], orbit, rrlMass, nOrbiters)
+
+	simulation(streamModels)
     
         

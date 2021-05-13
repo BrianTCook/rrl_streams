@@ -8,6 +8,8 @@ Created on Tue May 11 12:16:55 2021
 
 import numpy as np
 import pandas as pd
+import time
+import math
 
 from amuse.lab import *
 from amuse.couple import bridge
@@ -24,7 +26,7 @@ np.random.seed(42)
 class streamModel:
 	def __init__(self, centralMass, orbit, rrlMass, nOrbiters):
 
-		centralParticle = Particle(1)
+		centralParticle = Particles(1)
 		centralParticle.mass = centralMass|units.MSun
 		centralParticle.x = orbit.x() | units.kpc
 		centralParticle.y = orbit.y() | units.kpc
@@ -61,6 +63,8 @@ class streamModel:
 			orbiter.vy = orbit.vy() | units.kms
 			orbiter.vz = orbit.vz() | units.kms
 
+			orbiter.orbitalvelocity = np.sqrt( constants.G * self.centralParticle.mass / self.jacobiRadius )
+
 			#need to add random theta, phi values and displace st orbiter.pos = gc.pos + vec(jacobiradius)
 
 			randomPhi = 2. * np.pi * np.random.rand()
@@ -71,6 +75,16 @@ class streamModel:
 			orbiter.z += self.jacobiRadius * np.sin(randomTheta)
 
 		self.orbitingParticles = orbitingParticles
+
+def print_diagnostics(sim_time, t0, simulation_bodies, E_dyn, dE_dyn):
+
+	print('-----------------------------------------------------')
+	print('simulation time: ', sim_time)
+	print('wall time: %.03f minutes'%((time.time()-t0)/60.))
+	print('simulation_bodies.center_of_mass() in kpc: ', simulation_bodies.center_of_mass().value_in(units.kpc))
+	print('E_dyn: ', E_dyn)
+	print('dE_dyn: ', dE_dyn)
+	print('-----------------------------------------------------')	
 
 def orbitGetter(dataFile, specialGCs):
     
@@ -111,9 +125,8 @@ def solver_codes_initial_setup(galaxy_code, streamModels):
 
 	for stream in streamModels:
 
-		print(stream.orbitingParticles)
+		herm = BHTree(converter_sub)
 
-		herm = Hermite(converter_sub)
 		herm.particles.add_particles(stream.centralParticle)
 		#herm.particles.add_particles(stream.orbitingParticles)
 		gravity.add_system(herm, (galaxy_code,))  
@@ -130,13 +143,13 @@ def simulation(streamModels):
 	galaxy_code = to_amuse(MWPotential2014, t=0.0, tgalpy=0.0, reverse=False, ro=None, vo=None)
 	stars_g, gravity = solver_codes_initial_setup(galaxy_code, streamModels) #stars for gravity, stars for stellar
 
-	t_end, dt = 1000.|units.Myr, 0.01|units.Myr
+	t_end, dt = 1000.|units.Myr, 0.01|units.Mr
 
 	sim_times_unitless = np.arange(0., (t_end+dt).value_in(units.Myr), dt.value_in(units.Myr))
-	sim_tmes = [ t|units.Myr for t in sim_times_unitless ]
+	sim_times = [ t|units.Myr for t in sim_times_unitless ]
 
 	#for 3D numpy array storage
-	Nsavetimes = 99
+	Nsavetimes = 999
 	Ntotal = len(gravity.particles)
 
 	grav_data = np.zeros((Nsavetimes, Ntotal, 7))
@@ -187,7 +200,7 @@ def simulation(streamModels):
 			data_t_grav = data_t_grav.astype(float) #strings to floats
 
 			grav_data[j_like_index, :len(data_t_grav.index), :] = data_t_grav.values
-			np.savetxt('PhaseSpace_%s_%s_frame_%s_LCC.ascii'%(forward_or_backward, background_str, str(j).rjust(5, '0')), data_t_grav.values)
+			np.savetxt('PhaseSpace_frame_%s_streams.ascii'%(str(j).rjust(5, '0')), data_t_grav.values)
 
 			j_like_index += 1
 
@@ -205,7 +218,7 @@ if __name__ in '__main__':
 	dataFile = 'gcVasiliev.txt'
 	specialGCs = [ 'NGC_362', 'NGC_6626_M_28', 'Pal_5' ]
 	
-	gcMasses = [ 1., 1., 1. ] #mSun
+	gcMasses = [ 1e5, 1e5, 1e5 ] #mSun
 	rrlMass, nOrbiters = 0.65, 100 #mSun, integer
 
 	galaxy_code = MWPotential2014

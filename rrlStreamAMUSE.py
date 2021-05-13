@@ -46,16 +46,18 @@ class streamModel:
 			galMass += massElement.mass(np.sqrt(self.centralParticle.x.value_in(units.kpc)**2. + self.centralParticle.y.value_in(units.kpc)**2.), z=self.centralParticle.z.value_in(units.kpc))*bovy_conversion.mass_in_msol(220., 8.) | units.MSun
 
 		self.enclosedGalaxyMass = galMass
+		self.speed = np.sqrt(self.centralParticle.vx.value_in(units.kms)**2. + self.centralParticle.vy.value_in(units.kms)**2. + self.centralParticle.vz.value_in(units.kms)**2.) | units.kms
 
 		#enclosed galactic mass and jacobi radius
 		self.galactocentricDist = np.sqrt(self.centralParticle.x.value_in(units.kpc)**2. + self.centralParticle.y.value_in(units.kpc)**2. + self.centralParticle.z.value_in(units.kpc)**2.) | units.kpc
 		self.jacobiRadius = 3. * self.galactocentricDist * (centralParticle.mass.value_in(units.MSun) / self.enclosedGalaxyMass.value_in(units.MSun))**(1/3.)
+		self.crossingTime = self.galactocentricDist / self.speed
 
 		orbitingParticles = Particles(nOrbiters)
 
 		for orbiter in orbitingParticles:
 
-			orbiter.mass = rrlMass
+			orbiter.mass = rrlMass | units.MSun
 			orbiter.x = orbit.x() | units.kpc
 			orbiter.y = orbit.y() | units.kpc
 			orbiter.z = orbit.z() | units.kpc
@@ -63,16 +65,24 @@ class streamModel:
 			orbiter.vy = orbit.vy() | units.kms
 			orbiter.vz = orbit.vz() | units.kms
 
-			orbiter.orbitalvelocity = np.sqrt( constants.G * self.centralParticle.mass / self.jacobiRadius )
-
 			#need to add random theta, phi values and displace st orbiter.pos = gc.pos + vec(jacobiradius)
 
-			randomPhi = 2. * np.pi * np.random.rand()
-			randomTheta = np.arccos(1. - 2. * np.random.rand())
+			phi = 2. * np.pi * np.random.random()
+			theta = np.arccos(1. - 2. * np.random.random())
+			psi = 2. * np.pi * np.random.random()
 
-			orbiter.x += self.jacobiRadius * np.cos(randomTheta) * np.cos(randomPhi)
-			orbiter.y += self.jacobiRadius * np.cos(randomTheta) * np.sin(randomPhi)
-			orbiter.z += self.jacobiRadius * np.sin(randomTheta)
+			fCross = np.sqrt( constants.G * self.centralParticle.mass / self.jacobiRadius**(3.) )[0]
+			
+
+			thetaDot = fCross * np.cos(psi)
+			phiDot = fCross * np.sin(theta) * np.sin(psi)
+
+			orbiter.x += self.jacobiRadius * np.cos(theta) * np.cos(phi)
+			orbiter.y += self.jacobiRadius * np.cos(theta) * np.sin(phi)
+			orbiter.z += self.jacobiRadius * np.sin(theta)
+			orbiter.vx += self.jacobiRadius * (-np.cos(theta)*np.sin(phi)*phiDot - np.sin(theta)*np.cos(phi)*thetaDot)
+			orbiter.vy += self.jacobiRadius * (np.cos(theta)*np.sin(phi)*phiDot - np.sin(theta)*np.sin(phi)*thetaDot)
+			orbiter.vz += self.jacobiRadius * np.cos(theta) * thetaDot
 
 		self.orbitingParticles = orbitingParticles
 
@@ -125,10 +135,10 @@ def solver_codes_initial_setup(galaxy_code, streamModels):
 
 	for stream in streamModels:
 
-		herm = BHTree(converter_sub)
+		herm = Hermite(converter_sub)
 
 		herm.particles.add_particles(stream.centralParticle)
-		#herm.particles.add_particles(stream.orbitingParticles)
+		herm.particles.add_particles(stream.orbitingParticles)
 		gravity.add_system(herm, (galaxy_code,))  
 
 	return gravity.particles, gravity
@@ -143,13 +153,13 @@ def simulation(streamModels):
 	galaxy_code = to_amuse(MWPotential2014, t=0.0, tgalpy=0.0, reverse=False, ro=None, vo=None)
 	stars_g, gravity = solver_codes_initial_setup(galaxy_code, streamModels) #stars for gravity, stars for stellar
 
-	t_end, dt = 1000.|units.Myr, 0.01|units.Mr
+	t_end, dt = 150.|units.Myr, 10000.|units.yr
 
 	sim_times_unitless = np.arange(0., (t_end+dt).value_in(units.Myr), dt.value_in(units.Myr))
 	sim_times = [ t|units.Myr for t in sim_times_unitless ]
 
 	#for 3D numpy array storage
-	Nsavetimes = 999
+	Nsavetimes = 20
 	Ntotal = len(gravity.particles)
 
 	grav_data = np.zeros((Nsavetimes, Ntotal, 7))
@@ -216,9 +226,9 @@ def simulation(streamModels):
 if __name__ in '__main__':
     
 	dataFile = 'gcVasiliev.txt'
-	specialGCs = [ 'NGC_362', 'NGC_6626_M_28', 'Pal_5' ]
+	specialGCs = [ 'NGC_362', 'Pal_5', 'NGC_6626_M_28' ]
 	
-	gcMasses = [ 1e5, 1e5, 1e5 ] #mSun
+	gcMasses = {'NGC_362':3.45e5, 'NGC_6626_M_28':3.69e5, 'Pal_5':1.39e4} #mSun
 	rrlMass, nOrbiters = 0.65, 100 #mSun, integer
 
 	galaxy_code = MWPotential2014
@@ -228,9 +238,11 @@ if __name__ in '__main__':
 
 	streamModels = [ 0. for i in range(len(specialGCs)) ]
 
-	for idx, orbit in enumerate(orbits):
+	for idx, (GC, orbit) in enumerate(zip(specialGCs, orbits)):
 
-		streamModels[idx] = streamModel(gcMasses[idx], orbit, rrlMass, nOrbiters)
+		stream = streamModel(gcMasses[GC], orbit, rrlMass, nOrbiters)
+		streamModels[idx] = stream
+		print('GC and crossing time in Myr: ', GC, stream.crossingTime.value_in(units.Myr))
 
 	simulation(streamModels)
     

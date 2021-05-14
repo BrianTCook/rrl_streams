@@ -153,13 +153,13 @@ def simulation(streamModels):
 	galaxy_code = to_amuse(MWPotential2014, t=0.0, tgalpy=0.0, reverse=False, ro=None, vo=None)
 	stars_g, gravity = solver_codes_initial_setup(galaxy_code, streamModels) #stars for gravity, stars for stellar
 
-	t_end, dt = 150.|units.Myr, 10000.|units.yr
+	t_end, dt = 35.|units.Myr, 100|units.yr
 
 	sim_times_unitless = np.arange(0., (t_end+dt).value_in(units.Myr), dt.value_in(units.Myr))
 	sim_times = [ t|units.Myr for t in sim_times_unitless ]
 
 	#for 3D numpy array storage
-	Nsavetimes = 20
+	Nsavetimes = 36
 	Ntotal = len(gravity.particles)
 
 	grav_data = np.zeros((Nsavetimes, Ntotal, 7))
@@ -226,10 +226,10 @@ def simulation(streamModels):
 if __name__ in '__main__':
     
 	dataFile = 'gcVasiliev.txt'
-	specialGCs = [ 'NGC_362', 'Pal_5', 'NGC_6626_M_28' ]
+	specialGCs = [ 'NGC_362', 'Pal_5', 'NGC_5466' ]
 	
-	gcMasses = {'NGC_362':3.45e5, 'NGC_6626_M_28':3.69e5, 'Pal_5':1.39e4} #mSun
-	rrlMass, nOrbiters = 0.65, 100 #mSun, integer
+	gcMasses = {'NGC_362':3.45e5, 'Pal_5':1.39e4, 'NGC_5466':4.56e4} #mSun
+	rrlMass, nOrbiters = 0.65, 40 #mSun, integer
 
 	galaxy_code = MWPotential2014
 

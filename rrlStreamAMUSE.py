@@ -68,7 +68,7 @@ class streamModel:
 			#need to add random theta, phi values and displace st orbiter.pos = gc.pos + vec(jacobiradius)
 
 			phi = 2. * np.pi * np.random.random()
-			theta = np.arccos(1. - 2. * np.random.random())
+			theta = np.arccos(1. - 2. * np.random.random()) - np.pi/2.
 			psi = 2. * np.pi * np.random.random()
 
 			fCross = np.sqrt( constants.G * self.centralParticle.mass / self.jacobiRadius**(3.) )[0]
@@ -226,9 +226,9 @@ def simulation(streamModels):
 if __name__ in '__main__':
     
 	dataFile = 'gcVasiliev.txt'
-	specialGCs = [ 'NGC_362', 'Pal_5', 'NGC_5466' ]
+	specialGCs = [ 'NGC_362', 'Pal_5', 'NGC_5466', 'NGC_6626_M_28' ]
 	
-	gcMasses = {'NGC_362':3.45e5, 'Pal_5':1.39e4, 'NGC_5466':4.56e4} #mSun
+	gcMasses = {'NGC_362':3.45e5, 'Pal_5':1.39e4, 'NGC_5466':4.56e4, 'NGC_6626_M_28':3.69e5} #mSun
 	rrlMass, nOrbiters = 0.65, 40 #mSun, integer
 
 	galaxy_code = MWPotential2014

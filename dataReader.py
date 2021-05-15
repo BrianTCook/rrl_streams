@@ -43,7 +43,14 @@ def streamPlotter(files):
 
 		for i, stream in enumerate(dfStreams):
 
-			axi = axs[i]
+			if i == 0:
+				axi = axs[0,0]
+			if i == 1:
+				axi = axs[0,1]
+			if i == 2:
+				axi = axs[1,0]
+			if i == 3:
+				axi = axs[1,1]
 
 			yVals = [ y/1000. for y in stream['x'].tolist() ]
 			zVals = [ z/1000. for z in stream['y'].tolist() ]

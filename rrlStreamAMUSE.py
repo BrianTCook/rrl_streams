@@ -135,11 +135,11 @@ def solver_codes_initial_setup(galaxy_code, streamModels):
 
 	for stream in streamModels:
 
-		herm = Hermite(converter_sub)
+		subCode = Huayno(converter_sub)
 
-		herm.particles.add_particles(stream.centralParticle)
-		herm.particles.add_particles(stream.orbitingParticles)
-		gravity.add_system(herm, (galaxy_code,))  
+		subCode.particles.add_particles(stream.centralParticle)
+		subCode.particles.add_particles(stream.orbitingParticles)
+		gravity.add_system(subCode, (galaxy_code,))  
 
 	return gravity.particles, gravity
 
@@ -153,13 +153,13 @@ def simulation(streamModels):
 	galaxy_code = to_amuse(MWPotential2014, t=0.0, tgalpy=0.0, reverse=False, ro=None, vo=None)
 	stars_g, gravity = solver_codes_initial_setup(galaxy_code, streamModels) #stars for gravity, stars for stellar
 
-	t_end, dt = 25.|units.Myr, 100000|units.yr
+	t_end, dt = 20.|units.Myr, 2000.|units.yr
 
 	sim_times_unitless = np.arange(0., (t_end+dt).value_in(units.Myr), dt.value_in(units.Myr))
 	sim_times = [ t|units.Myr for t in sim_times_unitless ]
 
 	#for 3D numpy array storage
-	Nsavetimes = 26
+	Nsavetimes = 41
 	Ntotal = len(gravity.particles)
 
 	grav_data = np.zeros((Nsavetimes, Ntotal, 7))
@@ -226,9 +226,9 @@ def simulation(streamModels):
 if __name__ in '__main__':
     
 	dataFile = 'gcVasiliev.txt'
-	specialGCs = [ 'NGC_362', 'Pal_5', 'NGC_5466', 'NGC_6626_M_28' ]
-	
-	gcMasses = {'NGC_362':3.45e5, 'Pal_5':1.39e4, 'NGC_5466':4.56e4, 'NGC_6626_M_28':3.69e5} #mSun
+
+	specialGCs = [ 'NGC_362', 'Pal_5', 'NGC_5466', 'Pal_12' ]#, 'NGC_2419' ]	
+	gcMasses = {'NGC_362':3.45e5, 'Pal_5':1.39e4, 'NGC_5466':4.56e4, 'Pal_12':1.19e4, 'NGC_2419':9.81e5} #mSun
 	rrlMass, nOrbiters = 0.65, 40 #mSun, integer
 
 	galaxy_code = MWPotential2014

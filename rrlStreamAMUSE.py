@@ -153,7 +153,7 @@ def simulation(streamModels):
 	galaxy_code = to_amuse(MWPotential2014, t=0.0, tgalpy=0.0, reverse=False, ro=None, vo=None)
 	stars_g, gravity = solver_codes_initial_setup(galaxy_code, streamModels) #stars for gravity, stars for stellar
 
-	t_end, dt = 20.|units.Myr, 2000.|units.yr
+	t_end, dt = 20.|units.Myr, 5000.|units.yr
 
 	sim_times_unitless = np.arange(0., (t_end+dt).value_in(units.Myr), dt.value_in(units.Myr))
 	sim_times = [ t|units.Myr for t in sim_times_unitless ]
@@ -227,7 +227,7 @@ if __name__ in '__main__':
     
 	dataFile = 'gcVasiliev.txt'
 
-	specialGCs = [ 'NGC_362', 'Pal_5', 'NGC_5466', 'Pal_12' ]#, 'NGC_2419' ]	
+	specialGCs = [ 'NGC_362', 'Pal_5', 'NGC_5466', 'Pal_12', 'NGC_2419' ]	
 	gcMasses = {'NGC_362':3.45e5, 'Pal_5':1.39e4, 'NGC_5466':4.56e4, 'Pal_12':1.19e4, 'NGC_2419':9.81e5} #mSun
 	rrlMass, nOrbiters = 0.65, 40 #mSun, integer
 

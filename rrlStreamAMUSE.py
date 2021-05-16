@@ -131,7 +131,7 @@ def solver_codes_initial_setup(galaxy_code, streamModels):
 	converter_parent = nbody_system.nbody_to_si(1e11|units.MSun, 15.|units.kpc)
 	converter_sub = nbody_system.nbody_to_si(0.65|units.MSun, 1.|units.parsec) 
 
-	gravity = bridge.Bridge(use_threading=False)
+	gravity = bridge.Bridge()
 
 	for stream in streamModels:
 
@@ -153,13 +153,13 @@ def simulation(streamModels):
 	galaxy_code = to_amuse(MWPotential2014, t=0.0, tgalpy=0.0, reverse=False, ro=None, vo=None)
 	stars_g, gravity = solver_codes_initial_setup(galaxy_code, streamModels) #stars for gravity, stars for stellar
 
-	t_end, dt = 20.|units.Myr, 5000.|units.yr
+	t_end, dt = 35.|units.Myr, 10000.|units.yr
 
 	sim_times_unitless = np.arange(0., (t_end+dt).value_in(units.Myr), dt.value_in(units.Myr))
 	sim_times = [ t|units.Myr for t in sim_times_unitless ]
 
 	#for 3D numpy array storage
-	Nsavetimes = 41
+	Nsavetimes = 36
 	Ntotal = len(gravity.particles)
 
 	grav_data = np.zeros((Nsavetimes, Ntotal, 7))

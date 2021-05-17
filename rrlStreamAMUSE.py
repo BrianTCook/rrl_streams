@@ -10,10 +10,11 @@ import numpy as np
 import pandas as pd
 import time
 import math
+import glob
+import matplotlib.pyplot as plt
 
-from amuse.lab import *
-from amuse.couple import bridge
-from amuse.support import io
+plt.rc('text', usetex = True)
+plt.rc('font', family = 'serif')
 
 from astropy.coordinates import SkyCoord
 import astropy.units as u
@@ -222,28 +223,174 @@ def simulation(streamModels):
 
 	return 1
 
+def jacobiRadius(m, r, z):
+    
+    galMass = 0.
+
+    for massElement in MWPotential2014:
+        galMass += massElement.mass(r, z=z) * bovy_conversion.mass_in_msol(220., 8.) #MSun
+        
+    galactocentricDistance = np.sqrt(r**2. + z**2.)
+
+    return galactocentricDistance * (m / galMass)**(1/3.)
+
+def tidalRadii(nStreams, nSnapshots, files, streamNames):
+    
+    t0 = time.time()
+    outputArr = np.zeros((nSnapshots, nStreams))
+    tVals = np.linspace(0., 35., 36)
+    
+    try:
+        outputArr = np.loadtxt('tidalRadii.txt')
+    
+    except:
+        for i, file in enumerate(files):
+            
+            print('')
+            print('currently at snapshot %.0f Myr: '%(tVals[i]))
+            print('wall time: %.02f minutes'%((time.time()-t0)/60.))
+            
+            df = pd.read_csv(file, sep=' ', names=['mass','x','y','z','vx','vy','vz'])
+            dfBigParticles = df[df['mass'] > 1.].reset_index()
+            #dfBigParticles = dfBigParticles.reset_index()
+            
+            for j, row in dfBigParticles.iterrows():
+                
+                xKPC, yKPC, zKPC = row['x']/1000., row['y']/1000., row['z']/1000.
+                particleMass = row['mass']
+                
+                particleR, particleZ = np.sqrt(xKPC**2. + yKPC**2.), zKPC
+        
+                outputArr[i,j] = jacobiRadius(particleMass, particleR, particleZ) * 1000.
+        
+        np.savetxt('tidalRadii.txt', outputArr)
+    
+    plt.figure()
+    outputArr = np.loadtxt('tidalRadii.txt')
+    
+    for k in range(nStreams):
+        
+        oldString = streamNames[k]
+        newString = oldString.replace("_", " ")
+        
+        plt.plot(tVals, outputArr[:,k], label='%s'%(newString))
+        
+    plt.gca().set_yscale('log')
+    
+    plt.xlim(0, 35)
+    plt.ylim(30, 1500)
+    plt.axhline(y=1000, linestyle='--', c='k', linewidth=1)
+    
+    plt.gca().set_xlabel(r'$t_{\rm sim}$ [Myr]', fontsize=20)
+    plt.gca().set_ylabel(r'$r_{\rm Jacobi}$ [pc]', fontsize=20)
+    plt.annotate(r'$R_{\rm max}$', xy = (0.1, 0.91), xycoords = 'axes fraction', fontsize = 14)
+    
+    plt.gca().tick_params(labelsize='x-large')
+    plt.legend(loc='upper right', fontsize=10)
+    
+    
+    plt.savefig('jacobiRadii_appendix.pdf', bbox_inches='tight')
+    
+    return 1
+
+def alignments(nStreams, nSnapshots, files, streamNames):
+    
+    t0 = time.time()
+    outputArr = np.zeros((nSnapshots, nStreams))
+    tVals = np.linspace(0., 35., 36)
+    
+    try:
+        outputArr = np.loadtxt('medianAlignments.txt')
+    
+    except:
+        for i, file in enumerate(files):
+            
+            print('')
+            print('currently at snapshot %.0f Myr: '%(tVals[i]))
+            print('wall time: %.02f minutes'%((time.time()-t0)/60.))
+            
+            df = pd.read_csv(file, sep=' ', names=['mass','x','y','z','vx','vy','vz'])
+            dfStreams = np.array_split(df, nStreams)
+            
+            for j, dfStream in enumerate(dfStreams):
+                
+                vys,vzs = dfStream['vy'].tolist(), dfStream['vz'].tolist()
+                
+                vyBig, vzBig = vys[0], vzs[0]
+                vyLittle, vzLittle = vys[1:], vzs[1:]
+                
+                vHat = [ vyBig, vzBig ] / np.linalg.norm( np.array([ vyBig, vzBig ]) )
+                vsNormalized = [ [ vyl, vzl ] / np.linalg.norm(np.array([ vyl, vzl ])) for vyl, vzl in zip(vyLittle, vzLittle) ]
+                cosThetas = [ np.dot(v, vHat) for v in vsNormalized ]
+        
+                outputArr[i,j] = np.median(cosThetas)
+        
+        np.savetxt('medianAlignments.txt', outputArr)
+    
+    plt.figure()
+
+    for k in range(nStreams):
+        
+        oldString = streamNames[k]
+        newString = oldString.replace("_", " ")
+        
+        plt.plot(tVals, outputArr[:,k], label='%s'%(newString))
+    
+    plt.ylim(0.94, 1.01)
+    plt.xlim(0, 35)
+    plt.axhline(y=0.98, linestyle='--', c='k', linewidth=1)
+    
+    plt.gca().set_xlabel(r'$t_{\rm sim}$ [Myr]', fontsize=20)
+    plt.gca().set_ylabel(r'$\tilde{X}_{\theta}$', fontsize=20)
+    plt.annotate(r'$\tilde{X}_{\theta, {\rm min}}$', xy = (0.1, 0.6), xycoords = 'axes fraction', fontsize = 14)
+    
+    plt.gca().tick_params(labelsize='x-large')
+    plt.legend(loc='lower right', fontsize=10)
+    
+    plt.savefig('medianAlignments_appendix.pdf', bbox_inches='tight')
+    
+    return 1
+
 
 if __name__ in '__main__':
     
-	dataFile = 'gcVasiliev.txt'
+    dataFile = 'gcVasiliev.txt'
+    
+    specialGCs = [ 'NGC_362', 'Pal_5', 'NGC_5466', 'Pal_12', 'NGC_2419' ]	
+    gcMasses = {'NGC_362':3.45e5, 'Pal_5':1.39e4, 'NGC_5466':4.56e4, 'Pal_12':1.19e4, 'NGC_2419':9.81e5} #mSun
+    rrlMass, nOrbiters = 0.65, 40 #mSun, intege
+    
+    galaxy_code = MWPotential2014
+    
+    sortedNames, orbits = orbitGetter(dataFile, specialGCs)
+    specialGCs = sortedNames #sorted after being filled in from pandas dataframe
+    
+    plotting_flag = True
+    simulation_flag = False
 
-	specialGCs = [ 'NGC_362', 'Pal_5', 'NGC_5466', 'Pal_12', 'NGC_2419' ]	
-	gcMasses = {'NGC_362':3.45e5, 'Pal_5':1.39e4, 'NGC_5466':4.56e4, 'Pal_12':1.19e4, 'NGC_2419':9.81e5} #mSun
-	rrlMass, nOrbiters = 0.65, 40 #mSun, integer
+    if plotting_flag == True:
+        
+        nStreams, nSnapshots = 5, 36
+        streamNames = sortedNames
+    
+        files = glob.glob('*.ascii')
+        tidalRadii(nStreams, nSnapshots, files, streamNames)
+        alignments(nStreams, nSnapshots, files, streamNames)
 
-	galaxy_code = MWPotential2014
+    if simulation_flag == True:
 
-	sortedNames, orbits = orbitGetter(dataFile, specialGCs)
-	specialGCs = sortedNames #sorted after being filled in from pandas dataframe
-
-	streamModels = [ 0. for i in range(len(specialGCs)) ]
-
-	for idx, (GC, orbit) in enumerate(zip(specialGCs, orbits)):
-
-		stream = streamModel(gcMasses[GC], orbit, rrlMass, nOrbiters)
-		streamModels[idx] = stream
-		print('GC and crossing time in Myr: ', GC, stream.crossingTime.value_in(units.Myr))
-
-	simulation(streamModels)
+        from amuse.lab import *
+        from amuse.couple import bridge
+        from amuse.support import io
+        
+        streamModels = [ 0. for i in range(len(specialGCs)) ]
+    
+        for idx, (GC, orbit) in enumerate(zip(specialGCs, orbits)):
+    
+            stream = streamModel(gcMasses[GC], orbit, rrlMass, nOrbiters)
+            streamModels[idx] = stream
+            print('GC and crossing time in Myr: ', GC, stream.crossingTime.value_in(units.Myr))
+    
+        simulation(streamModels)
     
         
